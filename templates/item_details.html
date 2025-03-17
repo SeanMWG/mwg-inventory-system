@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Item Details</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container mt-4">
+    <h1 class="text-center">📦 Item Details</h1>
+
+    <div class="card">
+        <div class="card-header bg-dark text-white">
+            <h2>{{ item.asset_tag }} - {{ item.asset_type }}</h2>
+        </div>
+        <div class="card-body">
+            <p><strong>Site Name:</strong> {{ item.site_name }}</p>
+            <p><strong>Room Number:</strong> {{ item.room_number }}</p>
+            <p><strong>Room Name:</strong> {{ item.room_name }}</p>
+            <p><strong>Model:</strong> {{ item.model }}</p>
+            <p><strong>Serial Number:</strong> {{ item.serial_number }}</p>
+            <p><strong>Status:</strong> {{ item.status }}</p>
+            <p><strong>Assigned To:</strong> {% if item.assigned_to %} {{ item.assigned_to }} {% else %} None {% endif %}</p>
+            <p><strong>Loaner:</strong> {% if item.is_loaner %}✅ Yes{% else %}❌ No{% endif %}</p>
+            <p><strong>Notes:</strong> {{ item.notes }}</p>
+        </div>
+    </div>
+
+    <h3 class="mt-4">🔄 Checkout History</h3>
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>User</th>
+                <th>Checkout Date</th>
+                <th>Return Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for loan in loan_history %}
+            <tr>
+                <td>{{ loan.user_name }}</td>
+                <td>{{ loan.checkout_date.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                <td>{% if loan.return_date %} {{ loan.return_date.strftime('%Y-%m-%d %H:%M:%S') }} {% else %} Not Returned {% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>📜 Change History (Last 5 Edits)</h3>
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>User</th>
+                <th>Change Description</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in item.changes[:5] %}
+            <tr>
+                <td>{{ log.user.username }}</td>
+                <td>{{ log.change_description }}</td>
+                <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3">No changes logged for this item yet.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Inventory</a>
+</body>
+</html>

@@ -1,0 +1,116 @@
+/* 🌞 Light Mode (Default) */
+body {
+    background-color: #ffffff;
+    color: #000000;
+    transition: background 0.3s, color 0.3s;
+    font-family: Arial, sans-serif;
+    margin: 20px;
+}
+
+/* 🌙 Dark Mode */
+body.dark-mode {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+/* Container */
+.container {
+    width: 90%;
+    margin: auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark Mode Container */
+body.dark-mode .container {
+    background: #1e1e1e;
+    box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.1);
+}
+
+/* Tables */
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+th {
+    background-color: #007bff;
+    color: white;
+}
+
+/* Dark Mode Table */
+body.dark-mode th {
+    background-color: #333;
+}
+
+/* Buttons */
+button, .btn {
+    padding: 6px 12px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.btn-primary { background-color: #007bff; color: white; }
+.btn-danger { background-color: #dc3545; color: white; }
+.btn-warning { background-color: #ffc107; color: black; }
+.btn-success { background-color: #28a745; color: white; }
+.btn-secondary { background-color: #6c757d; color: white; }
+
+.search-buttons {
+    margin-left: 2px; /* Adds space between buttons */
+    margin-bottom: 5px;
+}
+
+.filter-controls {
+    margin-bottom: 15px; /* Adds space below search/filter fields */
+}
+
+/* Dark Mode Buttons */
+body.dark-mode .btn {
+    color: #ffffff;
+}
+
+/* 🌙 Dark Mode Enhancements */
+body.dark-mode {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+body.dark-mode .container {
+    background: #1e1e1e;
+    box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .btn {
+    background-color: #444;
+    color: white;
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+    background-color: #333;
+    color: white;
+    border: 1px solid #555;
+}
+
+body.dark-mode .table {
+    background-color: #1e1e1e;
+    color: white;
+}
+
+body.dark-mode th {
+    background-color: #333;
+}
