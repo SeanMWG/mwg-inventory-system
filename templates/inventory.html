@@ -1,186 +1,106 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>IT Inventory</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-</head>
-<body>
+{% extends "base.html" %}
 
-    <div class="container">
-        <h1>IT Inventory</h1>
+{% block content %}
+<div class="container mt-4">
+    <h2>Inventory Management</h2>
 
-        {% if current_user.is_authenticated %}
-            <div style="display: flex; justify-content: space-between;" class="search-buttons">
-                {% if current_user.is_admin() %}
-                    <a href="{{ url_for('add_inventory') }}" class="btn btn-primary">➕ Add New Item</a>
-                    <a href="{{ url_for('logs') }}" class="btn btn-secondary">📜 View Logs</a>
-                    <a href="{{ url_for('manage_users') }}" class="btn btn-warning">👥 Manage Users</a>
-                {% endif %}
-                <form action="{{ url_for('logout') }}" method="POST">
-                    <button type="submit" class="btn btn-danger">🚪 Logout</button>
-                </form>
-            </div>
-        {% endif %}
+    <!-- Search and Filters -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <form action="{{ url_for('index') }}" method="GET" class="d-flex flex-wrap gap-2">
+                <input type="text" name="query" value="{{ query }}" placeholder="🔍 Search..." class="form-control w-25">
+                
+                <select name="asset_type" class="form-select w-25">
+                    <option value="">All Asset Types</option>
+                    <option value="Laptop" {% if asset_type == 'Laptop' %}selected{% endif %}>Laptop</option>
+                    <option value="Phone" {% if asset_type == 'Phone' %}selected{% endif %}>Phone</option>
+                    <option value="Monitor" {% if asset_type == 'Monitor' %}selected{% endif %}>Monitor</option>
+                </select>
 
-        <!-- Search & Filter Form -->
-        <form method="GET" action="{{ url_for('index') }}" class="form-inline mb-3">
-            <div class="row g-2" class="filter-controls">
-                <div class="col-md-3">
-                    <input type="text" name="query" class="form-control" placeholder="Search..." value="{{ request.args.get('query', '') }}">
-                </div>
-                <div class="col-md-2">
-                    <input type="text" name="asset_type" class="form-control" placeholder="Asset Type..." value="{{ request.args.get('asset_type', '') }}">
-                </div>
-                <div class="col-md-2">
-                    <input type="text" name="site_name" class="form-control" placeholder="Site Name..." value="{{ request.args.get('site_name', '') }}">
-                </div>
-                <div class="col-md-2">
-                    <input type="text" name="assigned_to" class="form-control" placeholder="Assigned To..." value="{{ request.args.get('assigned_to', '') }}">
-                </div>
-                <div class="col-md-2">
-                    <select name="sort_by" class="form-select">
-                        <option value="asset_tag" {% if sort_by == 'asset_tag' %}selected{% endif %}>Sort by Asset Tag</option>
-                        <option value="site_name" {% if sort_by == 'site_name' %}selected{% endif %}>Sort by Site Name</option>
-                        <option value="assigned_to" {% if sort_by == 'assigned_to' %}selected{% endif %}>Sort by Assigned To</option>
-                    </select>
-                </div>
-                <div class="col-md-1">
-                    <button type="submit" class="btn btn-primary">Filter</button>
-                </div>
-            </div>
-        </form>
-   
-        <!-- Inventory Table -->
-        <table class="table table-bordered table-striped">
-            <thead>
+                <select name="site_name" class="form-select w-25">
+                    <option value="">All Sites</option>
+                    <option value="HQ" {% if site_name == 'HQ' %}selected{% endif %}>HQ</option>
+                    <option value="Branch 1" {% if site_name == 'Branch 1' %}selected{% endif %}>Branch 1</option>
+                    <option value="Branch 2" {% if site_name == 'Branch 2' %}selected{% endif %}>Branch 2</option>
+                </select>
+
+                <button type="submit" class="btn btn-primary">🔍 Search</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Inventory Table -->
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
                 <tr>
                     <th>Asset Tag</th>
                     <th>Asset Type</th>
                     <th>Site Name</th>
                     <th>Assigned To</th>
-                    {% if current_user.is_authenticated %}
-                        <th>Actions</th>
-                    {% endif %}
+                    <th>Status</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in inventory.items %}
-                    <tr>
-                        <td>{{ item.asset_tag }}</td>
-                        <td>{{ item.asset_type }}</td>
-                        <td>{{ item.site_name }}</td>
-                        <td>{% if item.assigned_to %} {{ item.assigned_to }} {% else %} None {% endif %}</td>
-                        <td>
-                            {% if current_user.is_authenticated %}
-                                <a href="{{ url_for('item_details', item_id=item.id) }}" class="btn btn-info btn-sm">ℹ️ View Details</a>
-        
-                                {% if current_user.is_admin() or current_user.is_editor() %}
-                                    <a href="{{ url_for('edit_inventory', item_id=item.id) }}" class="btn btn-warning btn-sm">✏️ Edit</a>
-                                {% endif %}
-                                
-                                {% if current_user.is_admin() %}
-                                    <form action="{{ url_for('delete_inventory', item_id=item.id) }}" method="POST" style="display:inline;">
-                                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?')">🗑️ Delete</button>
-                                    </form>
-                                {% endif %}
-        
-                                {% if item.is_loaner and not item.assigned_to %}
-                                    <a href="{{ url_for('checkout_inventory', item_id=item.id) }}" class="btn btn-success btn-sm">📤 Check Out</a>
-                                {% endif %}
-        
-                                {% if item.loan|length > 0 %}
-                                    <form action="{{ url_for('return_inventory', loan_id=item.loan[0].id) }}" method="POST" style="display:inline;">
-                                        <button type="submit" class="btn btn-secondary btn-sm" onclick="return confirm('Are you sure you want to return this item?')">🔄 Return</button>
-                                    </form>
-                                {% endif %}
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center">No inventory items found.</td>
-                    </tr>
+                <tr class="clickable-row" data-href="{{ url_for('item_details', item_id=item.id) }}" style="cursor: pointer;">
+                    <td>{{ item.asset_tag }}</td>
+                    <td>{{ item.asset_type }}</td>
+                    <td>{{ item.site_name }}</td>
+                    <td>{{ item.assigned_to or 'Unassigned' }}</td>
+                    <td>
+                        {% if item.is_loaner %}
+                            <span class="badge bg-warning">Loaner</span>
+                        {% endif %}
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
-        
-
-        <!-- Pagination Controls -->
-        <nav>
-            <div class="pagination">
-                {% if inventory.has_prev %}
-                    <a href="{{ url_for('index', page=inventory.prev_num) }}" class="btn btn-secondary">⬅ Prev</a>
-                {% endif %}
-            
-                {% for num in inventory.iter_pages(left_edge=2, right_edge=2, left_current=1, right_current=2) %}
-                    {% if num %}
-                        {% if num == inventory.page %}
-                            <span class="btn btn-primary">{{ num }}</span>
-                        {% else %}
-                            <a href="{{ url_for('index', page=num) }}" class="btn btn-secondary">{{ num }}</a>
-                        {% endif %}
-                    {% else %}
-                        <span class="btn btn-light">...</span>
-                    {% endif %}
-                {% endfor %}
-            
-                {% if inventory.has_next %}
-                    <a href="{{ url_for('index', page=inventory.next_num) }}" class="btn btn-secondary">Next ➡</a>
-                {% endif %}
-            </div>
-            <!--<button id="darkModeToggle" class="btn btn-dark">🌙 Toggle Dark Mode</button> -->
-
-        </nav>
-
     </div>
 
-    <script>
-        document.getElementById("filterForm").addEventListener("submit", function(event) {
-            event.preventDefault();  // Prevent default form submission
-    
-            // Get filter values
-            let siteName = document.getElementById("site_name").value;
-            let assetType = document.getElementById("asset_type").value;
-            let assignedTo = document.getElementById("assigned_to").value;
-            let dateAssigned = document.getElementById("date_assigned").value;
-            let sortBy = document.getElementById("sort_by").value;
-    
-            // Build query parameters
-            let params = new URLSearchParams({
-                site_name: siteName,
-                asset_type: assetType,
-                assigned_to: assignedTo,
-                date_assigned: dateAssigned,
-                sort_by: sortBy
-            });
-    
-            // Redirect to filtered inventory page
-            window.location.href = "/inventory?" + params.toString();
-        });
-    </script>
-    
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const darkModeToggle = document.getElementById("darkModeToggle");
-            const isDarkMode = localStorage.getItem("darkMode") === "enabled";
-    
-            if (isDarkMode) {
-                document.body.classList.add("dark-mode");
-            }
-    
-            darkModeToggle.addEventListener("click", function () {
-                document.body.classList.toggle("dark-mode");
-    
-                if (document.body.classList.contains("dark-mode")) {
-                    localStorage.setItem("darkMode", "enabled");
-                } else {
-                    localStorage.setItem("darkMode", "disabled");
-                }
-            });
-        });
-    </script>
-    
+    <!-- Pagination -->
+    <nav>
+        <ul class="pagination justify-content-center">
+            {% if inventory.has_prev %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('index', page=inventory.prev_num) }}">« Prev</a></li>
+            {% endif %}
 
-</body>
-</html>
+            {% for num in inventory.iter_pages() %}
+                {% if num %}
+                    <li class="page-item {% if num == inventory.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('index', page=num) }}">{{ num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if inventory.has_next %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('index', page=inventory.next_num) }}">Next »</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    
+    <div class="mt-4 d-flex justify-content-center">
+        <a href="{{ url_for('add_inventory') }}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Add New Item
+        </a>
+        <a href="{{ url_for('loaner_inventory') }}" class="btn btn-info ms-2">
+            <i class="fas fa-laptop"></i> View Loaner Inventory
+        </a>
+    </div>
+</div>
+
+<script>
+    // Make table rows clickable
+    document.addEventListener('DOMContentLoaded', function() {
+        const rows = document.querySelectorAll('.clickable-row');
+        rows.forEach(row => {
+            row.addEventListener('click', function() {
+                window.location.href = this.dataset.href;
+            });
+        });
+    });
+</script>
+{% endblock %}

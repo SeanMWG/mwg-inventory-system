@@ -207,20 +207,46 @@ def add_inventory():
             flash("An item with this asset tag already exists!", "warning")
             return redirect(url_for('add_inventory'))
 
+        # Create new inventory item with all fields
         new_item = Inventory(
+            # Basic information
             site_name=form.site_name.data,
             asset_tag=form.asset_tag.data,
             asset_type=form.asset_type.data,
             model=form.model.data,
             serial_number=form.serial_number.data,
             notes=form.notes.data if form.notes.data else None,
-            is_loaner=form.is_loaner.data  # ✅ Save Loaner Checkbox Value
+            
+            # Location information
+            room_number=form.room_number.data,
+            room_name=form.room_name.data,
+            
+            # Assignment information
+            assigned_to=form.assigned_to.data,
+            date_assigned=form.date_assigned.data,
+            date_decommissioned=form.date_decommissioned.data,
+            
+            # Category
+            category=request.form.get('category', ''),
+            
+            # Loaner status
+            is_loaner=form.is_loaner.data
         )
 
         db.session.add(new_item)
+        
+        # Add a log entry for the new item
+        log_entry = Log(
+            action="Item Added",
+            user=current_user.username,
+            item_name=f"{new_item.asset_tag} ({new_item.asset_type})",
+            timestamp=datetime.utcnow()
+        )
+        db.session.add(log_entry)
+        
         db.session.commit()
         flash("Inventory item added successfully!", "success")
-        return redirect(url_for('index'))
+        return redirect(url_for('item_details', item_id=new_item.id))
 
     return render_template('add_inventory.html', form=form)
 
@@ -232,23 +258,48 @@ def edit_inventory(item_id):
         flash("You do not have permission to edit inventory.", "danger")
         return redirect(url_for('index'))
 
-    item = Inventory.query.get_or_404(item_id)  # ✅ Fetch item
-    form = InventoryForm(obj=item)  # ✅ Pre-fill form
+    item = Inventory.query.get_or_404(item_id)  # Fetch item
+    form = InventoryForm(obj=item)  # Pre-fill form
 
     if form.validate_on_submit():
+        # Update basic information
         item.site_name = form.site_name.data
         item.asset_tag = form.asset_tag.data
         item.asset_type = form.asset_type.data
         item.model = form.model.data
         item.serial_number = form.serial_number.data
         item.notes = form.notes.data
-        item.is_loaner = 'is_loaner' in request.form 
-
+        
+        # Update location information
+        item.room_number = form.room_number.data
+        item.room_name = form.room_name.data
+        
+        # Update assignment information
+        item.assigned_to = form.assigned_to.data
+        item.date_assigned = form.date_assigned.data
+        item.date_decommissioned = form.date_decommissioned.data
+        
+        # Update category (from the custom form field)
+        item.category = request.form.get('category', '')
+        
+        # Update loaner status
+        item.is_loaner = 'is_loaner' in request.form
+        
+        # Add a change log entry
+        change_log = ChangeLog(
+            item_id=item.id,
+            user_id=current_user.id,
+            timestamp=datetime.utcnow(),
+            change_description=f"Item updated by {current_user.username}"
+        )
+        db.session.add(change_log)
+        
+        # Save changes
         db.session.commit()
         flash("Inventory item updated successfully!", "success")
-        return redirect(url_for('index'))
+        return redirect(url_for('item_details', item_id=item.id))
 
-    return render_template('edit_inventory.html', form=form, item=item)  # ✅ Ensure "item" is passed
+    return render_template('edit_inventory.html', form=form, item=item)
 
 @app.route('/inventory/delete/<int:item_id>', methods=['POST'])
 @login_required
