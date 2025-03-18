@@ -3,8 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_migrate import Migrate
-from forms import InventoryForm, CheckoutForm, UserForm, UpdateUserForm, AddInventoryForm
-from models import db, User, Inventory, Loan, Log, ChangeLog
+from forms import InventoryForm, CheckoutForm, UserForm, UpdateUserForm, AddInventoryForm, EditInventoryForm, LoginForm
+from models import db, User, Inventory, Loan, Log, ChangeLog, Checkout
 from datetime import datetime
 
 
@@ -28,19 +28,18 @@ def load_user(user_id):
 # ---- AUTHENTICATION ROUTES ---- #
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        user = User.query.filter_by(username=username).first()
+    form = LoginForm()  # ✅ Ensure the form is instantiated
 
-        if user and user.check_password(password):
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
+        if user and user.check_password(form.password.data):
             login_user(user)
             flash("Login successful!", "success")
             return redirect(url_for('index'))
         else:
             flash("Invalid username or password.", "danger")
 
-    return render_template('login.html')
+    return render_template('login.html', form=form)  # ✅ Pass 'form' to template
 
 @app.route('/logout', methods=['POST'])
 @login_required
@@ -195,29 +194,33 @@ def search():
 @app.route('/inventory/add', methods=['GET', 'POST'])
 @login_required
 def add_inventory():
-    if current_user.is_reader():  # ❌ Readers cannot add inventory
+    if not (current_user.is_admin() or current_user.is_editor()):
         flash("You do not have permission to add inventory.", "danger")
         return redirect(url_for('index'))
 
     form = InventoryForm()
+
     if form.validate_on_submit():
+        existing_item = Inventory.query.filter_by(asset_tag=form.asset_tag.data).first()
+        
+        if existing_item:
+            flash("An item with this asset tag already exists!", "warning")
+            return redirect(url_for('add_inventory'))
+
         new_item = Inventory(
             site_name=form.site_name.data,
-            room_number=form.room_number.data,
-            room_name=form.room_name.data,
             asset_tag=form.asset_tag.data,
             asset_type=form.asset_type.data,
             model=form.model.data,
             serial_number=form.serial_number.data,
-            notes=form.notes.data,
-            assigned_to=form.assigned_to.data,
-            date_assigned=form.date_assigned.data,
-            date_decommissioned=form.date_decommissioned.data
+            notes=form.notes.data if form.notes.data else None,
+            is_loaner=form.is_loaner.data  # ✅ Save Loaner Checkbox Value
         )
+
         db.session.add(new_item)
         db.session.commit()
-        flash(f"Inventory item {new_item.asset_tag} added successfully!", "success")
-        return redirect(url_for('inventory'))
+        flash("Inventory item added successfully!", "success")
+        return redirect(url_for('index'))
 
     return render_template('add_inventory.html', form=form)
 
@@ -229,27 +232,23 @@ def edit_inventory(item_id):
         flash("You do not have permission to edit inventory.", "danger")
         return redirect(url_for('index'))
 
-    item = Inventory.query.get_or_404(item_id)
-    form = InventoryForm(obj=item)
+    item = Inventory.query.get_or_404(item_id)  # ✅ Fetch item
+    form = InventoryForm(obj=item)  # ✅ Pre-fill form
 
     if form.validate_on_submit():
-        # Log changes
-        change_desc = f"Edited: {item.name} (Category: {item.category}, Status: {item.status})"
-        log_entry = ChangeLog(item_id=item.id, user_id=current_user.id, change_description=change_desc)
-        db.session.add(log_entry)
+        item.site_name = form.site_name.data
+        item.asset_tag = form.asset_tag.data
+        item.asset_type = form.asset_type.data
+        item.model = form.model.data
+        item.serial_number = form.serial_number.data
+        item.notes = form.notes.data
+        item.is_loaner = 'is_loaner' in request.form 
 
-        # Update item details
-        item.name = form.name.data
-        item.category = form.category.data
-        item.status = form.status.data
-        item.assigned_to = form.assigned_to.data
-        item.is_loaner = form.is_loaner.data
-        
         db.session.commit()
-        flash("Inventory item updated!", "success")
+        flash("Inventory item updated successfully!", "success")
         return redirect(url_for('index'))
 
-    return render_template('edit_inventory.html', form=form, item=item)
+    return render_template('edit_inventory.html', form=form, item=item)  # ✅ Ensure "item" is passed
 
 @app.route('/inventory/delete/<int:item_id>', methods=['POST'])
 @login_required
@@ -264,57 +263,102 @@ def delete_inventory(item_id):
     flash("Inventory item deleted!", "success")
     return redirect(url_for('index'))
 
-@app.route('/inventory/checkout/<int:item_id>', methods=['GET', 'POST'])
+@app.route("/inventory/checkout/<int:item_id>", methods=["POST"])
 @login_required
 def checkout_inventory(item_id):
-    if not current_user.is_admin():
-        flash("Only Admins can check out items.", "danger")
-        return redirect(url_for('index'))
-
-    item = Inventory.query.get_or_404(item_id)
-
-    if not item.is_loaner:
-        flash("This item is not available as a loaner.", "danger")
-        return redirect(url_for('index'))
-
-    form = CheckoutForm()
-    if form.validate_on_submit():
-        user = User.query.filter(User.username.ilike(form.user_name.data)).first()
-
-        if not user:
-            flash("User not found.", "danger")
-            return redirect(url_for('checkout_inventory', item_id=item.id))
-
-        loan = Loan(item_id=item.id, user_name=user.username, checkout_date=datetime.utcnow())
-        item.status = "Checked Out"
-        item.assigned_to = user.username
-        db.session.add(loan)
+    try:
+        # Ensure we get the latest data
+        db.session.expire_all()
+        
+        # Fetch the item and verify it exists
+        item = Inventory.query.get_or_404(item_id)
+        borrower_name = request.form.get("borrower_name")
+        
+        if not borrower_name:
+            flash("Borrower name is required", "danger")
+            return redirect(url_for("loaner_inventory"))
+        
+        # Check if item is a loaner
+        if not item.is_loaner:
+            flash(f"{item.asset_tag} is not a loaner device", "warning")
+            return redirect(url_for("loaner_inventory"))
+        
+        # Direct SQL check for active checkouts to avoid caching issues
+        active_checkouts = Checkout.query.filter_by(item_id=item.id, return_date=None).all()
+        
+        if active_checkouts:
+            flash(f"{item.asset_tag} is already checked out", "warning")
+            return redirect(url_for("loaner_inventory"))
+        
+        # Create the checkout record
+        new_checkout = Checkout(
+            user_id=current_user.id,
+            item_id=item.id,
+            borrower_name=borrower_name,
+            checkout_date=datetime.utcnow()
+        )
+        
+        # Add a log entry for the checkout
+        log_entry = Log(
+            action="Device Checkout",
+            user=current_user.username,
+            item_name=f"{item.asset_tag} ({item.asset_type})",
+            timestamp=datetime.utcnow()
+        )
+        
+        db.session.add(new_checkout)
+        db.session.add(log_entry)
         db.session.commit()
-        flash(f"{item.name} has been checked out to {user.username}.", "success")
-        return redirect(url_for('index'))
+        
+        # Verify the checkout was created
+        verify_checkout = Checkout.query.filter_by(id=new_checkout.id).first()
+        if verify_checkout:
+            flash(f"{item.asset_tag} checked out to {borrower_name}", "success")
+        else:
+            flash("Checkout failed - please try again", "danger")
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error during checkout: {str(e)}", "danger")
+        
+    return redirect(url_for("loaner_inventory"))
 
-    return render_template('checkout.html', form=form, item=item)
-
-@app.route('/inventory/return/<int:loan_id>', methods=['POST'])
+@app.route("/inventory/return/<int:checkout_id>", methods=["POST"])
 @login_required
-def return_inventory(loan_id):
-    loan = Loan.query.get_or_404(loan_id)
-
-    if loan.return_date:
-        flash("This item has already been returned.", "warning")
-        return redirect(url_for('index'))
-
-    loan.return_date = datetime.utcnow()
-    loan.inventory_item.status = "Available"
-    loan.inventory_item.assigned_to = None
-
-    # ✅ **Log the return action**
-    log = Log(action="Returned", user=current_user.username, item_name=loan.inventory_item.name, timestamp=datetime.utcnow())
-    db.session.add(log)
-
-    db.session.commit()
-    flash(f"{loan.inventory_item.name} has been returned.", "success")
-    return redirect(url_for('index'))
+def return_inventory(checkout_id):
+    try:
+        # Ensure we get the latest data
+        db.session.expire_all()
+        
+        checkout = Checkout.query.get_or_404(checkout_id)
+        if checkout.return_date is None:
+            # Get item info before committing
+            item_tag = checkout.inventory_item.asset_tag
+            item_type = checkout.inventory_item.asset_type
+            borrower = checkout.borrower_name
+            
+            # Set return date
+            checkout.return_date = datetime.utcnow()
+            
+            # Add a log entry for the return
+            log_entry = Log(
+                action="Device Return",
+                user=current_user.username,
+                item_name=f"{item_tag} ({item_type})",
+                timestamp=datetime.utcnow()
+            )
+            db.session.add(log_entry)
+            db.session.commit()
+            
+            flash(f"{item_tag} returned successfully from {borrower}", "success")
+        else:
+            flash("Item is already returned", "warning")
+    
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error during check-in: {str(e)}", "danger")
+        
+    return redirect(url_for("loaner_inventory"))
 
 @app.route('/logs')
 @login_required
@@ -333,3 +377,54 @@ def item_details(item_id):
     loan_history = Loan.query.filter_by(item_id=item.id).order_by(Loan.checkout_date.desc()).all()
     
     return render_template('item_details.html', item=item, loan_history=loan_history)
+
+#@app.route('/loaner_inventory')
+# @login_required
+#def loaner_inventory():
+  #  loaners = Inventory.query.filter_by(is_loaner=True).all()  # Get all loaners
+  #  return render_template('loaner_inventory.html', loaners=loaners)
+
+@app.route("/inventory/loaners")
+@login_required
+def loaner_inventory():
+    # Clear any cached data
+    db.session.expire_all()
+    
+    # Get all loaner items with a fresh query that includes their active checkouts
+    loaners = Inventory.query.filter_by(is_loaner=True).all()
+    
+    # For each loaner, directly query its active checkouts to bypass any caching
+    loaner_with_status = []
+    for item in loaners:
+        # Get active checkouts directly from database
+        active_checkouts = Checkout.query.filter_by(
+            item_id=item.id, 
+            return_date=None
+        ).order_by(Checkout.checkout_date.desc()).all()
+        
+        # First active checkout or None
+        active_checkout = active_checkouts[0] if active_checkouts else None
+        
+        loaner_with_status.append({
+            'item': item,
+            'active_checkout': active_checkout,
+            'is_checked_out': bool(active_checkout)
+        })
+    
+    return render_template(
+        "loaner_inventory.html", 
+        loaners=loaners,
+        loaner_with_status=loaner_with_status
+    )
+
+@app.route("/inventory/loaner-history")
+@login_required
+def loaner_history():
+    # Query all checkouts for loaner items
+    checkouts = Checkout.query\
+        .join(Inventory, Checkout.item_id == Inventory.id)\
+        .filter(Inventory.is_loaner == True)\
+        .order_by(Checkout.checkout_date.desc())\
+        .all()
+    
+    return render_template("loaner_history.html", checkouts=checkouts)

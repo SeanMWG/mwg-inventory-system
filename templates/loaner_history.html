@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Loaner Checkout History</h1>
+    
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>Asset Tag</th>
+                    <th>Asset Type</th>
+                    <th>Borrower</th>
+                    <th>Checked Out</th>
+                    <th>Checked In</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for checkout in checkouts %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('item_details', item_id=checkout.inventory_item.id) }}">
+                            {{ checkout.inventory_item.asset_tag }}
+                        </a>
+                    </td>
+                    <td>{{ checkout.inventory_item.asset_type }}</td>
+                    <td>{{ checkout.borrower_name }}</td>
+                    <td>{{ checkout.checkout_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        {% if checkout.return_date %}
+                            {{ checkout.return_date.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if checkout.return_date %}
+                            <span class="badge bg-success">Returned</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Active</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('loaner_inventory') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> Back to Loaner Inventory
+        </a>
+    </div>
+</div>
+{% endblock %}

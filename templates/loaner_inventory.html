@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Loaner Inventory</h1>
+
+    <div class="alert alert-info mb-4">
+        <p><strong>Instructions:</strong></p>
+        <ul>
+            <li>Available devices can be checked out by entering a borrower's name and clicking "Check Out"</li>
+            <li>Checked out devices can be returned by clicking the "Check In" button</li>
+            <li>View complete checkout history <a href="{{ url_for('loaner_history') }}">here</a></li>
+        </ul>
+    </div>
+    
+    {% if loaner_with_status %}
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Asset Tag</th>
+                    <th>Asset Type</th>
+                    <th>Model</th>
+                    <th>Serial</th>
+                    <th>Status</th>
+                    <th>Checkout Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for loaner in loaner_with_status %}
+                <tr>
+                    <td><a href="{{ url_for('item_details', item_id=loaner.item.id) }}">{{ loaner.item.asset_tag }}</a></td>
+                    <td>{{ loaner.item.asset_type }}</td>
+                    <td>{{ loaner.item.model }}</td>
+                    <td>{{ loaner.item.serial_number }}</td>
+                    
+                    <!-- Status column -->
+                    <td>
+                        {% if loaner.is_checked_out %}
+                            <span class="badge bg-warning text-dark">Checked out to:</span><br>
+                            <strong>{{ loaner.active_checkout.borrower_name }}</strong>
+                        {% else %}
+                            <span class="badge bg-success">Available</span>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Checkout date column -->
+                    <td>
+                        {% if loaner.is_checked_out %}
+                            {{ loaner.active_checkout.checkout_date.strftime('%Y-%m-%d %H:%M') }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Actions column -->
+                    <td>
+                        {% if loaner.is_checked_out %}
+                            <form method="POST" action="{{ url_for('return_inventory', checkout_id=loaner.active_checkout.id) }}" class="mb-2">
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="fas fa-undo"></i> Check In
+                                </button>
+                            </form>
+                            <p class="small text-muted">Checked out by: {{ loaner.active_checkout.user.username }}</p>
+                        {% else %}
+                            <form method="POST" action="{{ url_for('checkout_inventory', item_id=loaner.item.id) }}">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" name="borrower_name" placeholder="Borrower's Name" required>
+                                    <button type="submit" class="btn btn-success">Check Out</button>
+                                </div>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('loaner_history') }}" class="btn btn-info">
+            <i class="fas fa-history"></i> View Checkout History
+        </a>
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> Back to Main Inventory
+        </a>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <p>No loaner devices found in the system. To add a loaner device:</p>
+        <ol>
+            <li>Go to <a href="{{ url_for('add_inventory') }}">Add Inventory</a></li>
+            <li>Fill out the device details</li>
+            <li>Check the "Is Loaner" checkbox</li>
+            <li>Save the device</li>
+        </ol>
+    </div>
+    <a href="{{ url_for('index') }}" class="btn btn-primary">
+        <i class="fas fa-arrow-left"></i> Back to Main Inventory
+    </a>
+    {% endif %}
+</div>
+{% endblock %}

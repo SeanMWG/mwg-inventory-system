@@ -12,6 +12,9 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(20), nullable=False)  # Admin, Editor, Reader
 
+    # Define relationships correctly with explicit foreign keys
+    checkouts = db.relationship("Checkout", foreign_keys="Checkout.user_id", back_populates="user")
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -41,6 +44,12 @@ class Inventory(db.Model):
     assigned_to = db.Column(db.String(100), nullable=True)
     date_assigned = db.Column(db.Date, nullable=True)
     date_decommissioned = db.Column(db.Date, nullable=True)
+    is_loaner = db.Column(db.Boolean, default=False)
+    
+    # Updated relationships with explicit foreign keys to avoid ambiguity
+    loans = db.relationship('Loan', foreign_keys="Loan.item_id", backref='inventory_item', lazy=True)
+    checkouts = db.relationship("Checkout", foreign_keys="Checkout.item_id", backref="inventory_item", lazy=True)
+    changes = db.relationship('ChangeLog', foreign_keys="ChangeLog.item_id", backref='item', lazy=True)
 
     def __repr__(self):
         return f'<Inventory {self.asset_tag}>'
@@ -50,16 +59,14 @@ class Loan(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     item_id = db.Column(db.Integer, db.ForeignKey('inventory.id'), nullable=False)
-    user_name = db.Column(db.String(100), nullable=False)  # ✅ Store username instead of user ID
+    user_name = db.Column(db.String(100), nullable=False)
     checkout_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     return_date = db.Column(db.DateTime, nullable=True)
 
-    inventory_item = db.relationship('Inventory', backref=db.backref('loan', lazy=True))
-
 class Log(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    action = db.Column(db.String(100), nullable=False)  # Checked Out, Returned, etc.
-    user = db.Column(db.String(100), nullable=False)  # Who performed the action
+    action = db.Column(db.String(100), nullable=False)
+    user = db.Column(db.String(100), nullable=False)
     item_name = db.Column(db.String(200), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -71,6 +78,19 @@ class ChangeLog(db.Model):
     change_description = db.Column(db.String(255), nullable=False)
 
     user = db.relationship('User', backref='changes')
-    item = db.relationship('Inventory', backref='changes')
 
+class Checkout(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Match the existing database columns
+    item_id = db.Column(db.Integer, db.ForeignKey('inventory.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    borrower_name = db.Column(db.String(100), nullable=False)
+    checkout_date = db.Column(db.DateTime, default=datetime.utcnow)
+    return_date = db.Column(db.DateTime, nullable=True)
+    
+    # Remove inventory_id for now since it doesn't exist in the database yet
+    # inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.id', name="fk_checkout_inventory_id"), nullable=True)
 
+    # Define relationship with explicit foreign key to avoid ambiguity
+    user = db.relationship("User", foreign_keys=[user_id], back_populates="checkouts")
