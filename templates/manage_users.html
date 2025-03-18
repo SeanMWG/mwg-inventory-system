@@ -1,66 +1,76 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Manage Users</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-</head>
-<body class="container mt-4">
-    <h1 class="text-center">👥 Manage Users</h1>
+{% extends "base.html" %}
 
+{% block content %}
+<div class="container mt-4">
+    <h1 class="text-center">👤 Manage Users</h1>
+    
+    <!-- Add User Form -->
     <div class="card mb-4">
-        <div class="card-header bg-primary text-white">➕ Add New User</div>
+        <div class="card-header bg-primary text-white">
+            <h4>Add New User</h4>
+        </div>
         <div class="card-body">
-            <form method="POST">
+            <form method="POST" action="{{ url_for('manage_users') }}">
                 {{ form.hidden_tag() }}
-
-                <div class="mb-3">
-                    <label class="form-label">Username</label>
-                    {{ form.username(class="form-control", placeholder="Enter username") }}
+                
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            {{ form.username(class="form-control", required=True) }}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            {{ form.password(class="form-control", required=True) }}
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="role" class="form-label">Role</label>
+                            {{ form.role(class="form-select", required=True) }}
+                        </div>
+                    </div>
                 </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Password</label>
-                    {{ form.password(class="form-control", placeholder="Enter password") }}
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">Add User</button>
                 </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Role</label>
-                    {{ form.role(class="form-select") }}
-                </div>
-
-                <button type="submit" class="btn btn-success">✅ Add User</button>
             </form>
         </div>
     </div>
-
-    <h3>📜 Existing Users</h3>
-    <table class="table table-bordered table-striped">
+    
+    <!-- User List -->
+    <h2>Existing Users</h2>
+    <table class="table table-striped table-hover mt-3">
         <thead class="table-dark">
             <tr>
                 <th>Username</th>
                 <th>Role</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for user in users %}
-            <tr>
-                <td>{{ user.username }}</td>
-                <td>{{ user.role }}</td>
-                <td>
-                    <!-- Edit Button -->
-                    <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-primary btn-sm">✏️ Edit</a>
-        
-                    <!-- Delete Button -->
-                    <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" style="display:inline;">
-                        <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?')">🗑️ Delete</button>
-                    </form>
-                </td>
-            </tr>
+                <tr>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.role }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-warning btn-sm">✏️ Edit</a>
+                        {% if current_user.is_admin() %}
+                        <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?')">🗑️ Delete</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
             {% endfor %}
         </tbody>
-      
     </table>
 
     <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Inventory</a>
-</body>
-</html>
+</div>
+{% endblock %}

@@ -3,7 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_migrate import Migrate
-from forms import InventoryForm, CheckoutForm, UserForm, UpdateUserForm, AddInventoryForm, EditInventoryForm, LoginForm
+from forms import InventoryForm, CheckoutForm, UserForm, UpdateUserForm, AddInventoryForm, EditInventoryForm, LoginForm, ChangePasswordForm
 from models import db, User, Inventory, Loan, Log, ChangeLog, Checkout
 from datetime import datetime
 
@@ -516,3 +516,36 @@ def loaner_history():
         .all()
     
     return render_template("loaner_history.html", checkouts=checkouts)
+
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    form = ChangePasswordForm()
+    
+    if form.validate_on_submit():
+        # Verify current password
+        if current_user.check_password(form.current_password.data):
+            # Check if new passwords match
+            if form.new_password.data == form.confirm_password.data:
+                # Update password
+                current_user.set_password(form.new_password.data)
+                
+                # Create log entry
+                log_entry = Log(
+                    action="Password Change",
+                    user=current_user.username,
+                    item_name="User Account",
+                    timestamp=datetime.utcnow()
+                )
+                
+                db.session.add(log_entry)
+                db.session.commit()
+                
+                flash("Your password has been updated successfully.", "success")
+                return redirect(url_for('index'))
+            else:
+                flash("New password and confirmation do not match.", "danger")
+        else:
+            flash("Current password is incorrect.", "danger")
+    
+    return render_template('change_password.html', form=form)
