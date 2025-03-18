@@ -118,6 +118,13 @@ def index():
     assigned_to = request.args.get('assigned_to', '', type=str)
     sort_by = request.args.get('sort_by', 'asset_tag', type=str)
 
+    # Get unique values for dropdowns from the database
+    unique_asset_types = db.session.query(Inventory.asset_type).distinct().order_by(Inventory.asset_type).all()
+    asset_types = [item[0] for item in unique_asset_types if item[0]]  # Extract values and filter out None/empty
+    
+    unique_site_names = db.session.query(Inventory.site_name).distinct().order_by(Inventory.site_name).all()
+    site_names = [item[0] for item in unique_site_names if item[0]]  # Extract values and filter out None/empty
+
     # Start with a base query
     inventory_query = Inventory.query
 
@@ -150,15 +157,33 @@ def index():
     # Apply pagination
     inventory = inventory_query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return render_template('inventory.html', inventory=inventory, query=query, asset_type=asset_type, site_name=site_name, assigned_to=assigned_to, sort_by=sort_by)
+    return render_template(
+        'inventory.html', 
+        inventory=inventory, 
+        query=query, 
+        asset_type=asset_type, 
+        site_name=site_name, 
+        assigned_to=assigned_to, 
+        sort_by=sort_by,
+        asset_types=asset_types,
+        site_names=site_names
+    )
 
 @app.route('/search')
 def search():
     query = request.args.get('query', '', type=str).strip()
-    category = request.args.get('category', '', type=str)
+    asset_type = request.args.get('asset_type', '', type=str)
+    site_name = request.args.get('site_name', '', type=str)
     sort_by = request.args.get('sort_by', 'asset_tag', type=str)
     page = request.args.get('page', 1, type=int)
     per_page = 25
+
+    # Get unique values for dropdowns from the database
+    unique_asset_types = db.session.query(Inventory.asset_type).distinct().order_by(Inventory.asset_type).all()
+    asset_types = [item[0] for item in unique_asset_types if item[0]]  # Extract values and filter out None/empty
+    
+    unique_site_names = db.session.query(Inventory.site_name).distinct().order_by(Inventory.site_name).all()
+    site_names = [item[0] for item in unique_site_names if item[0]]  # Extract values and filter out None/empty
 
     # Start with a base query
     search_query = Inventory.query
@@ -172,9 +197,12 @@ def search():
             (Inventory.assigned_to.ilike(f"%{query}%"))
         )
 
-    # Filter by category (if provided)
-    if category:
-        search_query = search_query.filter(Inventory.asset_type == category)
+    # Apply filters
+    if asset_type:
+        search_query = search_query.filter(Inventory.asset_type.ilike(f"%{asset_type}%"))
+    
+    if site_name:
+        search_query = search_query.filter(Inventory.site_name.ilike(f"%{site_name}%"))
 
     # Sorting logic
     if sort_by == "asset_tag":
@@ -187,7 +215,16 @@ def search():
     # Apply pagination
     inventory_items = search_query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return render_template('inventory.html', inventory=inventory_items, query=query, category=category, sort_by=sort_by)
+    return render_template(
+        'inventory.html', 
+        inventory=inventory_items, 
+        query=query, 
+        asset_type=asset_type, 
+        site_name=site_name, 
+        sort_by=sort_by,
+        asset_types=asset_types,
+        site_names=site_names
+    )
 
 # ---- INVENTORY MANAGEMENT ---- #
 

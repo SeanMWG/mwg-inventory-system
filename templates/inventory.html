@@ -12,16 +12,16 @@
                 
                 <select name="asset_type" class="form-select w-25">
                     <option value="">All Asset Types</option>
-                    <option value="Laptop" {% if asset_type == 'Laptop' %}selected{% endif %}>Laptop</option>
-                    <option value="Phone" {% if asset_type == 'Phone' %}selected{% endif %}>Phone</option>
-                    <option value="Monitor" {% if asset_type == 'Monitor' %}selected{% endif %}>Monitor</option>
+                    {% for type in asset_types %}
+                        <option value="{{ type }}" {% if asset_type == type %}selected{% endif %}>{{ type }}</option>
+                    {% endfor %}
                 </select>
 
                 <select name="site_name" class="form-select w-25">
                     <option value="">All Sites</option>
-                    <option value="HQ" {% if site_name == 'HQ' %}selected{% endif %}>HQ</option>
-                    <option value="Branch 1" {% if site_name == 'Branch 1' %}selected{% endif %}>Branch 1</option>
-                    <option value="Branch 2" {% if site_name == 'Branch 2' %}selected{% endif %}>Branch 2</option>
+                    {% for site in site_names %}
+                        <option value="{{ site }}" {% if site_name == site %}selected{% endif %}>{{ site }}</option>
+                    {% endfor %}
                 </select>
 
                 <button type="submit" class="btn btn-primary">🔍 Search</button>
